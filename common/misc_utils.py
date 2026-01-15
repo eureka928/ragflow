@@ -100,9 +100,22 @@ def once(func):
 
 @once
 def pip_install_torch():
-    device = os.getenv("DEVICE", "cpu")
-    if device=="cpu":
+    import shutil
+    device = os.getenv("DEVICE", "cpu").lower()
+    if device == "cpu":
         return
-    logging.info("Installing pytorch")
-    pkg_names = ["torch>=2.5.0,<3.0.0"]
-    subprocess.check_call([sys.executable, "-m", "pip", "install", *pkg_names])
+
+    # Detect package manager (uv in Docker, pip otherwise)
+    uv_path = shutil.which("uv")
+    if uv_path:
+        cmd = [uv_path, "pip", "install"]
+    else:
+        cmd = [sys.executable, "-m", "pip", "install"]
+
+    # CUDA index for GPU-enabled PyTorch
+    cuda_version = os.getenv("CUDA_VERSION", "cu124")
+    cmd.extend(["--index-url", f"https://download.pytorch.org/whl/{cuda_version}"])
+    cmd.append("torch>=2.5.0,<3.0.0")
+
+    logging.info(f"Installing PyTorch with {cuda_version} support")
+    subprocess.check_call(cmd)
